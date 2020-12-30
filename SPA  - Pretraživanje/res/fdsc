@@ -1,0 +1,405 @@
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.Set;
+
+import org.svetovid.Svetovid;
+import org.svetovid.io.SvetovidReader;
+
+// Tip podataka koji predstavlja jednu autobusku liniju
+class Linija {
+
+	private final String odGrada;
+	private final String doGrada;
+	private final double cenaKarte;
+
+	public Linija(String odGrada, String doGrada, double cenaKarte) {
+
+		// Ne dozvoljavamo null za grad
+		if (odGrada == null) {
+			throw new IllegalArgumentException("odGrada");
+		}
+		this.odGrada = odGrada;
+
+		// Ne dozvoljavamo null za grad
+		if (doGrada == null) {
+			throw new IllegalArgumentException("doGrada");
+		}
+		this.doGrada = doGrada;
+
+		// Ne dozvoljavamo negativne cene
+		if (cenaKarte < 0.0) {
+			throw new IllegalArgumentException("cena");
+		}
+		this.cenaKarte = cenaKarte;
+
+	}
+
+	public String getOdGrada() {
+		return odGrada;
+	}
+
+	public String getDoGrada() {
+		return doGrada;
+	}
+
+	public double getCenaKarte() {
+		return cenaKarte;
+	}
+
+	@Override
+	public int hashCode() {
+		final int prostBroj = 29;
+		int rezultat = 1;
+		long temp = Double.doubleToLongBits(cenaKarte);
+		rezultat = prostBroj * rezultat + (int) (temp ^ (temp >>> 32));
+		rezultat = prostBroj * rezultat + doGrada.hashCode();
+		rezultat = prostBroj * rezultat + odGrada.hashCode();
+		return rezultat;
+	}
+
+	@Override
+	public boolean equals(Object obj) {
+		if (this == obj) {
+			return true;
+		}
+		if (obj == null) {
+			return false;
+		}
+		if (getClass() != obj.getClass()) {
+			return false;
+		}
+		Linija that = (Linija) obj;
+		if (!Objects.equals(this.doGrada, that.doGrada)) {
+			return false;
+		}
+		if (!Objects.equals(this.odGrada, that.odGrada)) {
+			return false;
+		}
+		if (Double.compare(this.cenaKarte, that.cenaKarte) != 0) {
+			return false;
+		}
+		return true;
+	}
+
+	@Override
+	public String toString() {
+		return odGrada + " - " + doGrada + " (" + cenaKarte + ")";
+	}
+}
+
+// Klasa koja sadrzi informacije o svim autobuskim linijama
+class MrezaLinija {
+
+	// Mapiramo svaki grad na skup linija koje polaze iz tog grada
+	protected final Map<String, Set<Linija>> linije;
+
+	// Pravimo novu praznu mrezu autobuskih linija
+	public MrezaLinija() {
+		linije = new HashMap<>();
+	}
+
+	// Pravimo kopiju prosledjene mreze autobuskih linija
+	public MrezaLinija(MrezaLinija mreza) {
+
+		// Napravimo praznu mrezu na standardan nacin
+		this();
+
+		// Iskopiramo sve linije
+		linije.putAll(mreza.linije);
+
+	}
+
+	// Ucitavamo mrezu autobuskih linija iz prosledjenog fajla
+	public MrezaLinija(SvetovidReader in) {
+
+		// Napravimo praznu mrezu na standardan nacin
+		this();
+
+		// Ucitavamo liniju po liniju sve dok ima podataka
+		while (in.hasMore()) {
+
+			// Ucitamo prvi neprazan red
+			String odGrada = null;
+			do {
+				odGrada = in.readLine();
+			} while (odGrada != null && odGrada.isEmpty());
+
+			// Ucitamo sledeci red
+			String doGrada = in.readLine();
+
+			// I cenu na kraju
+			Double cenaKarte = in.readDoubleBoxed();
+
+			// Napravimo liniju i ubacimo je
+			// samo ako smo dobro ucitali podatke
+			if (odGrada != null && doGrada != null && cenaKarte != null) {
+				Linija linija = new Linija(odGrada, doGrada, cenaKarte);
+				dodajLiniju(linija);
+			}
+
+		}
+
+	}
+
+	// Vracamo uvek novu promenlivu sortiranu listu svih gradova
+	public List<String> gradovi() {
+
+		// Skupljamo sve gradove u skup
+		Set<String> gradovi = new HashSet<>();
+
+		// Idemo po svim registrovanim linijama
+		for (Set<Linija> skup : linije.values()) {
+			for (Linija linija : skup) {
+
+				// I ubacujemo gradove
+				gradovi.add(linija.getOdGrada());
+				gradovi.add(linija.getDoGrada());
+
+			}
+		}
+
+		// napravimo novu listu i dodamo sve gradve iz skupa
+		List<String> lista = new ArrayList<>(gradovi);
+
+		// Sortiramo je i vratimo
+		Collections.sort(lista);
+		return lista;
+
+	}
+
+	// Vracamo novi promenljivi skup linija koje polaze iz datog grada
+	public Set<Linija> linije(String grad) {
+
+		// Napravimo novi prazan skup
+		Set<Linija> rezultat = new HashSet<>();
+
+		// Pronadjemo skup linija
+		Set<Linija> skup = linije.get(grad);
+
+		// Ako taj skup postoji, dodamo sve linije u novi skup
+		// koji vracamo onome ko nas je pozvao
+		if (skup != null) {
+			rezultat.addAll(skup);
+		}
+
+		// Vratimo novi skup
+		return rezultat;
+
+	}
+
+	// Dodajemo datu autobusku liniju u interne strukture
+	public void dodajLiniju(Linija linija) {
+
+		// Pronadjemo skup linija iz polaznog grada
+		String grad = linija.getOdGrada();
+		Set<Linija> skup = linije.get(grad);
+
+		// Ako nema tog skupa, ovo je prva linija
+		if (skup == null) {
+
+			// Napravimo novi prazan skup
+			skup = new HashSet<>();
+
+			// Dodamo ga u internu mapu
+			linije.put(grad, skup);
+
+		}
+
+		// Sada svakako imamo skup i samo dodamo liniju
+		skup.add(linija);
+
+	}
+
+	// Uklanjamo datu autobusku liniju internih struktura
+	public void ukloniLiniju(Linija linija) {
+
+		// Pronadjemo skup linija iz polaznog grada
+		String grad = linija.getOdGrada();
+		Set<Linija> skup = linije.get(grad);
+
+		// Ako nema tog skupa, znaci da linija nije registrovana
+		if (skup == null) {
+			return;
+		}
+
+		// Uklonimo liniju
+		skup.remove(linija);
+
+		// A ako je skup ostao prazan, uklonimo i ceo skup
+		if (skup.isEmpty()) {
+			linije.remove(skup);
+		}
+
+	}
+}
+
+// Tip podataka koji predstavlja jedan put
+class Put {
+
+	// Lista linija preko kojih putujemo
+	private final List<Linija> linije;
+
+	// Napravimo novi prazan put
+	public Put() {
+		linije = new ArrayList<>();
+	}
+
+	// Napravimo kopiju datog puta
+	public Put(Put original) {
+
+		// Napravimo prazan put na standardan nacin
+		this();
+
+		// Dodamo sve linije
+		linije.addAll(original.linije);
+
+	}
+
+	// Da li se grad nalazi na putu
+	public boolean sadrzi(String grad) {
+
+		// Da li je to polazni grad?
+		if (!linije.isEmpty() && linije.get(0).getOdGrada().equals(grad)) {
+			return true;
+		}
+
+		// Ili je neki od medjustanica
+		for (Linija linija : linije) {
+			if (linija.getDoGrada().equals(grad)) {
+				return true;
+			}
+		}
+
+		// Nema ga medju linijama
+		return false;
+
+	}
+
+	// Produzimo put za datu liniju
+	public void produzi(Linija linija) {
+
+		// Ako vec imamo linija na putu
+		if (!linije.isEmpty()) {
+
+			// Poslednji grad poslednje linije
+			String poslednjiGrad = linije.get(linije.size() - 1).getDoGrada();
+
+			// I prvi grad nove linije moraju da se poklapaju
+			if (!poslednjiGrad.equals(linija.getOdGrada())) {
+				throw new IllegalArgumentException("linija");
+			}
+
+		}
+
+		// Ako je sve ok, samo dodamo liniju
+		linije.add(linija);
+
+	}
+
+	// Skratimo put za poslednju liniju
+	public Linija skrati() {
+
+		// Ako je put prazan, ne mozemo ga skratiti
+		if (linije.isEmpty()) {
+			throw new IllegalStateException("Prazan put ne moze da se skrati");
+		}
+
+		// Inace samo uklonimo poslednju liniju
+		return linije.remove(linije.size() - 1);
+
+	}
+
+	public double ukupnaCena() {
+		double ukupnaCena = 0.0;
+		for (Linija linija : linije) {
+			ukupnaCena = ukupnaCena + linija.getCenaKarte();
+		}
+		return ukupnaCena;
+	}
+
+	@Override
+	public String toString() {
+		return ukupnaCena() + " " + linije.toString();
+	}
+}
+
+public class MrezaLinijaProgram {
+
+	public static void main(String[] args) {
+
+		// Ucitamo mrezu autobuskih linija
+		MrezaLinija mreza = new MrezaLinija(Svetovid.in("Linije.txt"));
+
+		// Pitamo korisnika za polazni i ciljni grad
+		Svetovid.out.println("Red voznje sadrzi sledece gradove:");
+		Svetovid.out.println(mreza.gradovi());
+		String polazniGrad = Svetovid.in.readLine("Unesite polazni grad:");
+		String ciljniGrad = Svetovid.in.readLine("Unesite ciljni grad:");
+
+		// Rekurzivni algoritam
+		pronadjiPuteveRekurzivno(mreza, polazniGrad, ciljniGrad);
+
+	}
+
+	// Priprema za rekurzivno trazenje puta
+	private static void pronadjiPuteveRekurzivno(MrezaLinija mreza, String polazniGrad, String ciljniGrad) {
+
+		// Napravimo pomocnu strukturu koja nam sadrzi trenutni put
+		// Ona je na poetku prazna
+		Put put = new Put();
+
+		// Rekurzivno pronadjemo sve puteve
+		int brPuteva = pronadjiPuteveRekurzivno(mreza, put, 0, polazniGrad, ciljniGrad);
+
+		// Ispisemo poruku ako nismo pronasli ni jedan put
+		if (brPuteva == 0) {
+			Svetovid.out.println();
+			Svetovid.out.println("Nazalost, ne postoji put izmadju datih gradova");
+		}
+
+	}
+
+	// Rekurzivno trazenje puteva
+	private static int pronadjiPuteveRekurzivno(MrezaLinija mreza, Put put, int brPuteva, String polazniGrad, String ciljniGrad) {
+
+		// Stigli smo do ciljnog grada
+		if (polazniGrad.equals(ciljniGrad)) {
+
+			// Ispisemo put
+			Svetovid.out.println(put);
+
+			// Nasli smo jos jedan put
+			return ++brPuteva;
+
+		}
+
+		// Ako nismo, idemo redom po svim linijama koje polaze iz tog grada
+		for (Linija linija : mreza.linije(polazniGrad)) {
+
+			// Ako vec nismo bili tamo, probamo da odemo
+			if (!put.sadrzi(linija.getDoGrada())) {
+
+				// Produzimo put za ovu novu liniju
+				put.produzi(linija);
+
+				// Probamo preko ovog novog grada da stignemo do cilja
+				brPuteva = pronadjiPuteveRekurzivno(mreza, put, brPuteva, linija.getDoGrada(), ciljniGrad);
+
+				// Pri povratku, izbacimo liniju iz puta
+				put.skrati();
+
+			}
+
+		}
+
+		// Vratimo koliko smo puteva pronasli
+		return brPuteva;
+
+	}
+
+}
